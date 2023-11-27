@@ -11,15 +11,16 @@ Ensure that you have already cloned this repo into the right folder in data ...
 ```bash
 ssh -X username@data.cs.purdue.edu
 ```
-6. Ensure that your `.vscode/c_cpp_properties.json` file looks something like this (the files will not be the same, but it should be populated with something):
+6. Ensure that your `.vscode/c_cpp_properties.json` file looks something like this (the paths will not be the same, but it should be populated with something):
 ![c_cpp_properties.json](https://github.com/Arty5654/Project6-GUI-in-C/blob/main/includePath.png?raw=true)
 
 ## Steps to run Task Manager:
-1. Code away, and once you are ready to compile, run the following command:
+1. Ensure you logged into XQuartz and are still connected
+2. Compile the program by running the following command:
 ```bash
 gcc -o main main.c `pkg-config --cflags --libs gtk+-3.0`
 ```
-2. Run the Task Manager using the following command:
+3. Run the Task Manager using the following command:
 ```bash
 ./main
 ```
