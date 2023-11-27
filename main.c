@@ -3,6 +3,8 @@
  * main.c
  */
 
+#include "app.h"
+
 #include <gtk/gtk.h>
 
 int main(int argc, char *argv[]) {
@@ -14,7 +16,7 @@ int main(int argc, char *argv[]) {
 
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), "Task Manager");
-    gtk_window_set_default_size(GTK_WINDOW(window), 400, 300);
+    gtk_window_set_default_size(GTK_WINDOW(window), 600, 400);
 
 
     // Connect the destroy event to the gtk_main_quit function
