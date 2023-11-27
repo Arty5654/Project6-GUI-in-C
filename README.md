@@ -1,22 +1,25 @@
 # Project6-GUI-in-C
 
+Ensure that you have already cloned this repo into the right folder in data ...
+
+## Setup Steps
+1. Install XQuartz - https://www.xquartz.org/
+2. Once downloaded, you might have to log out of your computer then log back in.
+3. Open XQuartz > Settings > Security
+4. Make sure "Allow connections from network clients" is checked
+5. ssh into data using XQuartz terminal by doing the following
+```bash
+ssh -X username@data.cs.purdue.edu
+```
+6. Ensure that your `.vscode/c_cpp_properties.json` file looks something like this (the files will not be the same, but it should be populated with something):
+![c_cpp_properties.json](https://github.com/Arty5654/Project6-GUI-in-C/blob/main/includePath.png?raw=true)
+
 ## Steps to run Task Manager:
-1.  Install GTK Development Libraries:
-```bash
-brew install gtk+3
-```
-2. Install PKG Config Helper:
-```bash
-brew install pkg-config
-```
-3. Run the following command:
-```
-pkg-config --cflags gtk+-3.0
-```
-4. Take the output of Step 3, and include it in your `c_cpp_properties.json` file in the .vscode folder. When doing this step, remove the -I from the beginning of each path. Your includePath should something look like this:
-![Yash's c_cpp_properties.json file](https://github.com/Arty5654/Project6-GUI-in-C/blob/main/includePath.png?raw=true)
-5. Code away, and once you are ready to compile, run the following command:
+1. Code away, and once you are ready to compile, run the following command:
 ```bash
 gcc -o main main.c `pkg-config --cflags --libs gtk+-3.0`
 ```
-6. Run the Task Manager through `./main`
+2. Run the Task Manager using the following command:
+```bash
+./main
+```
