@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
     GtkWidget *tab4 = gtk_label_new("File Systems");
 
     // Add tabs to the notebook
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), tab1, gtk_label_new("Deez Nuts"));
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), tab1, gtk_label_new("System"));
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook), tab2, gtk_label_new("Processes"));
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook), tab3, gtk_label_new("Resources"));
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook), tab4, gtk_label_new("File Systems"));
