@@ -22,5 +22,5 @@ gcc -o main main.c `pkg-config --cflags --libs gtk+-3.0`
 ```
 3. Run the Task Manager using the following command:
 ```bash
-./main
+./mytaskmanager
 ```
