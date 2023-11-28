@@ -16,9 +16,9 @@ ssh -X username@data.cs.purdue.edu
 
 ## Steps to run Task Manager:
 1. Ensure you logged into XQuartz and are still connected
-2. Compile the program by running the following command:
+2. Compile the program by running the following command (We have a Makefile):
 ```bash
-gcc -o main main.c `pkg-config --cflags --libs gtk+-3.0`
+make
 ```
 3. Run the Task Manager using the following command:
 ```bash
