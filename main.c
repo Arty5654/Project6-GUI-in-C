@@ -17,6 +17,13 @@ int main(int argc, char *argv[]) {
   // Initialize GTK
   gtk_init(&argc, &argv);
 
+
+GtkCssProvider *cssProvider = gtk_css_provider_new();
+gtk_css_provider_load_from_path(cssProvider, "style.css", NULL);
+gtk_style_context_add_provider_for_screen(gdk_screen_get_default(),
+    GTK_STYLE_PROVIDER(cssProvider),
+    GTK_STYLE_PROVIDER_PRIORITY_USER);
+
   // Create the main window
   GtkWidget *window;
 
