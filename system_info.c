@@ -9,7 +9,7 @@
  * Function to get all system information
  */
 
-void display_system_info(GtkWidget *info_label) {
+void display_system_info(GtkWidget *info_box) {
   // Buffer to accumulate information
   char info_buffer[4096];
   info_buffer[0] = '\0'; // Ensure the buffer is initially empty
@@ -110,6 +110,21 @@ void display_system_info(GtkWidget *info_label) {
     printf("Couldn't get disk space information\n");
   }
 
-  // Update the label with the accumulated information
-  gtk_label_set_text(GTK_LABEL(info_label), info_buffer);
+  // Create a GtkLabel for the system info
+  GtkWidget *info_label = gtk_label_new(info_buffer); // No conflict now, as we've changed the parameter name
+  gtk_label_set_selectable(GTK_LABEL(info_label), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(info_label), 0.0);  // Align the label text to the left
+
+  // Remove any previous widgets in the info_box
+  GList *children, *iter;
+  children = gtk_container_get_children(GTK_CONTAINER(info_box));
+  for(iter = children; iter != NULL; iter = g_list_next(iter))
+    gtk_widget_destroy(GTK_WIDGET(iter->data));
+  g_list_free(children);
+
+  // Add the new label to the info_box
+  gtk_box_pack_start(GTK_BOX(info_box), info_label, TRUE, TRUE, 0);
+
+  // Show all widgets within the info_box
+  gtk_widget_show_all(info_box);
 } /* display_system_info() */
