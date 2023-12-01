@@ -138,9 +138,9 @@ void get_process_info(GtkListStore *store, gboolean only_user_processes) {
             
             // Insert the data into the list store
             gtk_list_store_insert_with_values(store, NULL, -1,
-                                              0, (gint)pid,
-                                              1, name,
-                                              2, status,
+                                              0, name,
+                                              1, status,
+                                              2, (gint)pid,
                                               3, memory,
                                               -1);
             g_free(name);
@@ -166,9 +166,9 @@ GList* get_all_processes(gboolean only_user_processes) {
     while (valid) {
         ProcessInfo *info = g_new0(ProcessInfo, 1);
         gtk_tree_model_get(GTK_TREE_MODEL(store), &iter,
-                           0, &info->pid,
-                           1, &info->name,
-                           2, &info->status,
+                           0, &info->name,
+                           1, &info->status,
+                           2, &info->pid,
                            3, &info->memory,
                            -1);
         process_list = g_list_prepend(process_list, info);
@@ -216,7 +216,8 @@ static gfloat get_process_memory(pid_t pid) {
     gchar *contents = NULL;
     g_file_get_contents(filepath, &contents, NULL, NULL);
     gchar **tokens = g_strsplit(contents, " ", -1);
-    gfloat memory = g_ascii_strtoll(tokens[1], NULL, 10) * (getpagesize() / 1024.0 / 1024.0);
+    //gfloat memory = g_ascii_strtoll(tokens[1], NULL, 10) * (getpagesize() / 1024.0 / 1024.0);
+    gfloat memory = g_ascii_strtoll(tokens[1], NULL, 10) * (getpagesize() / 1024.0);
     g_strfreev(tokens);
     g_free(contents);
     g_free(filepath);
@@ -245,10 +246,10 @@ void populate_list_store(GtkListStore *store, GList *process_list) {
     for (GList *iter = process_list; iter != NULL; iter = iter->next) {
         ProcessInfo *info = iter->data;
         gtk_list_store_insert_with_values(store, NULL, -1,
-                                          0, info->pid,
-                                          1, info->name,
-                                          2, info->status,
-                                          3, info->user,
+                                          0, info->name,
+                                          1, info->status,
+                                          2, info->user,
+                                          3, info->pid,
                                           4, info->memory,
                                           -1);
     }
@@ -257,18 +258,17 @@ void populate_list_store(GtkListStore *store, GList *process_list) {
 // Function to create and display the tree view for process information
 void display_process_info(GtkWidget *box, gboolean only_user_processes) {
     // Create the list store with appropriate columns for process information
-    GtkListStore *store = gtk_list_store_new(5, G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_FLOAT, G_TYPE_INT);
+    GtkListStore *store = gtk_list_store_new(4, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_INT, G_TYPE_FLOAT);
 
     // Create the tree view and add it to the list store
     GtkWidget *tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(store));
     g_object_unref(store); // The tree view has its own reference now
 
-    // Add columns to the GtkTreeView for PID, Name, Status, Memory, and CPU
-    add_tree_view_column(tree_view, "PID", 0);
-    add_tree_view_column(tree_view, "Name", 1);
-    add_tree_view_column(tree_view, "Status", 2);
+    // Add columns to the GtkTreeView for Process Name, Status, PID, and Memory
+    add_tree_view_column(tree_view, "Process Name", 0);
+    add_tree_view_column(tree_view, "Status", 1);
+    add_tree_view_column(tree_view, "PID", 2);
     add_tree_view_column(tree_view, "Memory (MiB)", 3);
-    add_tree_view_column(tree_view, "CPU Time", 4);
 
     // Populate the initial process list
     get_process_info(store, only_user_processes);
