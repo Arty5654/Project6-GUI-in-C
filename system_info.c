@@ -39,17 +39,23 @@ void display_system_info(GtkWidget *info_box) {
     printf("Couldn't read /etc/os-release\n");
   }
 
-  // Run "uname -srm" to get kernel version
-  FILE *uname_pipe = popen("uname -srm", "r");
-  if (uname_pipe != NULL) {
-    char kernel_version_buffer[1024];
-    if (fgets(kernel_version_buffer, sizeof(kernel_version_buffer), uname_pipe) != NULL) {
-      // Extract and append the kernel version to the buffer
-      snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Kernel: %s", kernel_version_buffer);
+  FILE *version_file = fopen("/proc/version", "r");
+
+  if (version_file != NULL) {
+    char version_buffer[1024];
+    if (fgets(version_buffer, sizeof(version_buffer), version_file) != NULL) {
+      // Find the first parenthesis and truncate the string
+      char *parenthesis_pos = strchr(version_buffer, '(');
+      if (parenthesis_pos != NULL) {
+        *parenthesis_pos = '\0'; // Truncate the string at the parenthesis
+      }
+
+      // Append the kernel version to the buffer
+      snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Kernel: %s", version_buffer);
     }
-    pclose(uname_pipe);
+    fclose(version_file);
   } else {
-    printf("Couldn't run uname command\n");
+    printf("Couldn't open /proc/version\n");
   }
 
   // Read /proc/meminfo file for memory information
@@ -73,29 +79,27 @@ void display_system_info(GtkWidget *info_box) {
   }
 
   // Read processor information from lscpu command
-  FILE *lscpu_file = popen("lscpu", "r");
-  if (lscpu_file != NULL) {
-    char lscpu_buffer[1024];
-    while (fgets(lscpu_buffer, sizeof(lscpu_buffer), lscpu_file) != NULL) {
-      // Check for the line containing the processor information
-      if (strstr(lscpu_buffer, "Model name:") != NULL) {
-        // Skip leading whitespace
-        char *model_name_start = strchr(lscpu_buffer, ':');
-        if (model_name_start != NULL) {
-          model_name_start++; // Move past the colon
-          while (*model_name_start == ' ' || *model_name_start == '\t') {
-            model_name_start++; // Skip leading whitespace
-          }
+  FILE *cpuinfo_file = fopen("/proc/cpuinfo", "r");
 
+  if (cpuinfo_file != NULL) {
+    char cpuinfo_buffer[1024];
+    while (fgets(cpuinfo_buffer, sizeof(cpuinfo_buffer), cpuinfo_file) != NULL) {
+      // Check for the line containing the processor information
+      if (strstr(cpuinfo_buffer, "model name") != NULL) {
+        // Skip leading whitespace and the colon
+        char *model_name_start = strchr(cpuinfo_buffer, ':');
+        if (model_name_start != NULL) {
+          model_name_start += 2; // Move past the colon and the following space
+          
           // Append the processor information to the buffer
-          snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Processor: %s\n", model_name_start);
+          snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Processor: %s", model_name_start);
+          break; // Assuming you only want the first occurrence
         }
-        break; // Assuming you only want the first occurrence
       }
     }
-    pclose(lscpu_file);
+    fclose(cpuinfo_file);
   } else {
-      printf("Couldn't run lscpu command\n");
+    printf("Couldn't open /proc/cpuinfo\n");
   }
 
   // Get disk space information using statvfs
