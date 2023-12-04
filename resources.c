@@ -28,6 +28,10 @@ static CpuUsage cpu;
 static MemoryUsage mem;
 static GtkWidget *g_drawing_area = NULL;
 static GtkWidget *g_mem_drawing_area = NULL;
+static float global_memory_percentage;
+static float global_swap_percentage;
+static float total_memory_in_gib;
+static float total_swap_in_gib;
 
 // Forward declaration
 static void draw_cpu_graph(GtkWidget *widget, cairo_t *cr);
@@ -195,6 +199,18 @@ static void draw_cpu_graph(GtkWidget *widget, cairo_t *cr) {
     cairo_show_text(cr, "-60s");
     cairo_move_to(cr, width - margin - 30, height - 10);
     cairo_show_text(cr, "Now");
+
+    // Draw the key and percentage text at the bottom of the graph
+    int key_x = margin;
+    int key_y = height - margin + 20; // 20 pixels below the bottom margin
+
+    // Memory key and text
+    cairo_set_source_rgb(cr, 0.3, 0.6, 0.9); // Green for memory
+    cairo_fill(cr);
+    cairo_move_to(cr, key_x + 150, key_y);
+    char mem_text[256];
+    sprintf(mem_text, "CPUs (All)");
+    cairo_show_text(cr, mem_text);
 }
 
 static void draw_memory_graph(GtkWidget *widget, cairo_t *cr) {
@@ -298,6 +314,26 @@ static void draw_memory_graph(GtkWidget *widget, cairo_t *cr) {
     cairo_show_text(cr, "-60s");
     cairo_move_to(cr, width - margin - 30, height - 10);
     cairo_show_text(cr, "Now");
+
+    // Draw the key and percentage text at the bottom of the graph
+    int key_x = margin;
+    int key_y = height - margin + 20; // 20 pixels below the bottom margin
+
+    // Memory key and text
+    cairo_set_source_rgb(cr, 0.2, 0.8, 0.2); // Green for memory
+    cairo_fill(cr);
+    cairo_move_to(cr, key_x + 150, key_y);
+    char mem_text[256];
+    sprintf(mem_text, "Memory: %.1f%% of %.1f GiB", global_memory_percentage, total_memory_in_gib);
+    cairo_show_text(cr, mem_text);
+
+    // Swap key and text
+    cairo_set_source_rgb(cr, 0.8, 0.2, 0.2); // Red for swap
+    cairo_fill(cr);
+    cairo_move_to(cr, key_x + 450, key_y);
+    char swap_text[256];
+    sprintf(swap_text, "Swap: %.1f%% of %.1f GiB", global_swap_percentage, total_swap_in_gib);
+    cairo_show_text(cr, swap_text);
 }
 
 static void read_memory_usage() {
@@ -323,6 +359,12 @@ static void read_memory_usage() {
     // Calculate usage as a percentage
     mem.mem_usage[mem.last] = 100.0f * (1.0f - ((float)memFree / memTotal));
     mem.swap_usage[mem.last] = 100.0f * (1.0f - ((float)swapFree / swapTotal));
+
+    total_memory_in_gib = memTotal / (1024.0f * 1024.0f);
+    total_swap_in_gib = swapTotal / (1024.0f * 1024.0f);
+
+    global_memory_percentage = (1.0f - ((float)memFree / memTotal)) * 100.0f;
+    global_swap_percentage = (1.0f - ((float)swapFree / swapTotal)) * 100.0f;
 }
 
 // Function to be called when the "Resources" tab is selected
