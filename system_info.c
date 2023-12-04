@@ -23,14 +23,14 @@ void display_system_info(GtkWidget *info_box) {
       if (strstr(os_release_buffer, "PRETTY_NAME=") != NULL) {
         char os_name[1024];
         if (sscanf(os_release_buffer, "PRETTY_NAME=\"%[^ ]", os_name) == 1) {
-          snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "%s\n", os_name);
+          snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "%s\n\n", os_name);
         }
       }
       // Extract and append the OS version to the buffer
       else if (strstr(os_release_buffer, "VERSION=") != NULL) {
         char os_version[1024];
         if (sscanf(os_release_buffer, "VERSION=\"%[^\"]\"", os_version) == 1) {
-          snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Version: %s\n", os_version);
+          snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Version: %s\n\n", os_version);
         }
       }
     }
@@ -90,7 +90,7 @@ void display_system_info(GtkWidget *info_box) {
         char *model_name_start = strchr(cpuinfo_buffer, ':');
         if (model_name_start != NULL) {
           model_name_start += 2; // Move past the colon and the following space
-          
+
           // Append the processor information to the buffer
           snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Processor: %s", model_name_start);
           break; // Assuming you only want the first occurrence
@@ -115,9 +115,13 @@ void display_system_info(GtkWidget *info_box) {
   }
 
   // Create a GtkLabel for the system info
-  GtkWidget *info_label = gtk_label_new(info_buffer); // No conflict now, as we've changed the parameter name
+  GtkWidget *info_label = gtk_label_new(info_buffer);
   gtk_label_set_selectable(GTK_LABEL(info_label), TRUE);
   gtk_label_set_xalign(GTK_LABEL(info_label), 0.0);  // Align the label text to the left
+
+  // Set the alignment of the info_label
+  gtk_widget_set_halign(info_label, GTK_ALIGN_CENTER);
+  gtk_widget_set_valign(info_label, GTK_ALIGN_CENTER);
 
   // Remove any previous widgets in the info_box
   GList *children, *iter;
@@ -126,7 +130,7 @@ void display_system_info(GtkWidget *info_box) {
     gtk_widget_destroy(GTK_WIDGET(iter->data));
   g_list_free(children);
 
-  // Add the new label to the info_box
+  // Add the info_label to the info_box
   gtk_box_pack_start(GTK_BOX(info_box), info_label, TRUE, TRUE, 0);
 
   // Show all widgets within the info_box
