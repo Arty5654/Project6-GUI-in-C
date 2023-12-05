@@ -32,6 +32,7 @@ static gchar* get_process_name(pid_t pid);
 static gchar* get_process_status(pid_t pid);
 static gfloat get_process_memory(pid_t pid);
 static gint get_process_cpu(pid_t pid);
+static GtkTreeModelFilter *filter_model = NULL;
 
 typedef struct {
     long pid;             
@@ -526,43 +527,73 @@ void populate_list_store(GtkListStore *store, GList *process_list) {
     }
 }
 
+// Function to filter processes based on search query
+static gboolean process_filter_func(GtkTreeModel *model, GtkTreeIter *iter, gpointer data) {
+    const gchar *search_query = data;
+    gchar *name;
+    gboolean visible = FALSE;
+
+    if (!search_query || !*search_query) {
+        return TRUE; // Show all rows if no search query
+    }
+
+    gtk_tree_model_get(model, iter, COLUMN_NAME, &name, -1);
+
+    if (name != NULL) {
+        visible = g_strstr_len(name, -1, search_query) != NULL;
+        g_free(name);
+    }
+
+    return visible;
+}
+
+// Callback for search entry changes
+void search_entry_changed_cb(GtkSearchEntry *search_entry, gpointer user_data) {
+    const gchar *text = gtk_entry_get_text(GTK_ENTRY(search_entry));
+    gtk_tree_model_filter_set_visible_func(GTK_TREE_MODEL_FILTER(user_data), process_filter_func, (gpointer)text, NULL);
+    gtk_tree_model_filter_refilter(GTK_TREE_MODEL_FILTER(user_data));
+}
+
 // Function to create and display the tree view for process information
 void display_process_info(GtkWidget *box, gboolean only_user_processes) {
-    // Create the list store with appropriate columns for process information
     GtkListStore *store = gtk_list_store_new(5, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_INT, G_TYPE_FLOAT, G_TYPE_STRING);
+    GtkTreeModelFilter *filter_model = GTK_TREE_MODEL_FILTER(gtk_tree_model_filter_new(GTK_TREE_MODEL(store), NULL));
 
-    // Create the tree view and add it to the list store
-    GtkWidget *tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(store));
-    g_object_unref(store); // The tree view has its own reference now
+    // Set up the search entry
+    GtkWidget *search_entry = gtk_search_entry_new();
+    g_signal_connect(search_entry, "search-changed", G_CALLBACK(search_entry_changed_cb), filter_model);
+    gtk_box_pack_start(GTK_BOX(box), search_entry, FALSE, FALSE, 0);
 
-    // Add columns to the GtkTreeView for Process Name, Status, PID, and Memory
-    add_tree_view_column(tree_view, "Process Name", 0);
-    add_tree_view_column(tree_view, "Status", 1);
-    add_tree_view_column(tree_view, "PID", 2);
-    add_tree_view_column(tree_view, "Memory (MiB)", 3);
-    add_tree_view_column(tree_view, "User", 4);
+    // Create the tree view with the filter model
+    GtkWidget *tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(filter_model));
+    g_object_unref(store); // Release the list store as the filter model holds a reference to it
 
-    // Populate the initial process list
+    // Add columns to the tree view
+    add_tree_view_column(tree_view, "Process Name", COLUMN_NAME);
+    add_tree_view_column(tree_view, "Status", COLUMN_STATUS);
+    add_tree_view_column(tree_view, "PID", COLUMN_PID);
+    add_tree_view_column(tree_view, "Memory (MiB)", COLUMN_MEMORY);
+    add_tree_view_column(tree_view, "User", COLUMN_USER);
+
+    // Populate the list store
     get_process_info(store, only_user_processes);
 
-    // Create a scrolled window and add the tree view to it
+    // Scrolled window for the tree view
     GtkWidget *scrolled_window = gtk_scrolled_window_new(NULL, NULL);
     gtk_container_add(GTK_CONTAINER(scrolled_window), tree_view);
-
-    // Pack the scrolled window into the box
     gtk_box_pack_start(GTK_BOX(box), scrolled_window, TRUE, TRUE, 0);
 
-    //If double clicked
+    // Row activated signal
     g_signal_connect(tree_view, "row-activated", G_CALLBACK(on_row_activated), NULL);
 
-    // Add a refresh button
+    // Refresh button
     GtkWidget *refresh_button = gtk_button_new_with_label("Refresh");
     g_signal_connect(refresh_button, "clicked", G_CALLBACK(refresh_process_list), store);
     gtk_box_pack_start(GTK_BOX(box), refresh_button, FALSE, FALSE, 0);
 
-    // Show all widgets
     gtk_widget_show_all(box);
 }
+
 
 // Add a column to the tree view
 void add_tree_view_column(GtkWidget *tree_view, const gchar *title, gint column_id) {
