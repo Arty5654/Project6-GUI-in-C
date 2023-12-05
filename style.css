@@ -1,3 +1,20 @@
 label {
   color: red;
 }
+
+scrolledwindow {
+  background-color: black;
+}
+
+treeview {
+  background-color: black;
+  color: white;
+}
+
+box {
+  background-color: black;
+}
+
+page {
+  background-color: black;
+}
