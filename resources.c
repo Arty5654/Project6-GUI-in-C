@@ -1,6 +1,6 @@
 /*
  * resources.c
- * Author: Yash Mehta
+ * Author: Yash Mehta and Arteom Avetissian
  * CS 252 - Task Manager Project
  */
 
@@ -10,6 +10,8 @@
 
 #define CPU_HISTORY 60
 #define MEMORY_HISTORY 60
+#define NETWORK_HISTORY 60
+#define MAX_BANDWIDTH 20
 
 // Structs to hold memory usage and cpu usage data
 typedef struct _MemoryUsage {
@@ -23,6 +25,13 @@ typedef struct _CpuUsage {
     int last;
 } CpuUsage;
 
+typedef struct _NetworkUsage {
+    float received[NETWORK_HISTORY];
+    float transmitted[NETWORK_HISTORY];
+    int last;
+} NetworkUsage;
+
+
 // global variables
 static CpuUsage cpu;
 static MemoryUsage mem;
@@ -32,11 +41,13 @@ static float global_memory_percentage;
 static float global_swap_percentage;
 static float total_memory_in_gib;
 static float total_swap_in_gib;
+static NetworkUsage net;
 
 // Forward declaration
 static void draw_cpu_graph(GtkWidget *widget, cairo_t *cr);
 static void draw_memory_graph(GtkWidget *widget, cairo_t *cr);
 static void read_memory_usage();
+static void read_network_usage();
 
 // Function to read CPU usage from /proc/stat
 static float read_cpu_usage() {
@@ -109,6 +120,152 @@ static gboolean update_resource_usage(gpointer user_data) {
 
     return TRUE;
 }
+
+static void read_network_usage() {
+    FILE *fp;
+    char buf[1024];
+    char *line;
+    unsigned long long int receive, transmit;
+
+    fp = fopen("/proc/net/dev", "r");
+    if (!fp) {
+        perror("Error opening /proc/net/dev");
+        return;
+    }
+
+    // Skip the first two lines (headers)
+    fgets(buf, sizeof(buf), fp);
+    fgets(buf, sizeof(buf), fp);
+
+    // Read data for each network interface
+    while ((line = fgets(buf, sizeof(buf), fp)) != NULL) {
+        // Example line: "eth0: 12345 0 0 0 0 0 0 0 67890 0 0 0 0 0 0 0"
+        char iface[128];
+        sscanf(line, "%s %llu %*d %*d %*d %*d %*d %*d %llu", iface, &receive, &transmit);
+
+        // You might want to filter out the loopback interface (lo) or others
+        if (strcmp(iface, "lo:") != 0) {
+            net.last = (net.last + 1) % MEMORY_HISTORY;
+            net.received[net.last] = receive;
+            net.transmitted[net.last] = transmit;
+        }
+    }
+
+    fclose(fp);
+}
+
+static void draw_network_graph(GtkWidget *widget, cairo_t *cr) {
+    GtkAllocation allocation;
+    gtk_widget_get_allocation(widget, &allocation);
+    int width = allocation.width;
+    int height = allocation.height;
+
+    const int margin = 30;  // Margin for the graph
+
+    // Clear the background
+    cairo_set_source_rgb(cr, 1, 1, 1); // White background
+    cairo_paint(cr);
+
+    // Draw the axes
+    cairo_set_source_rgb(cr, 0, 0, 0); // Black color for axes
+    cairo_set_line_width(cr, 1.0);
+
+    // Draw the Y-axis
+    cairo_move_to(cr, margin, margin);
+    cairo_line_to(cr, margin, height - margin);
+    cairo_stroke(cr);
+
+    // Draw the X-axis
+    cairo_move_to(cr, margin, height - margin);
+    cairo_line_to(cr, width - margin, height - margin);
+    cairo_stroke(cr);
+
+    // Draw horizontal lines for Y-axis
+    for (int i = 0; i <= MAX_BANDWIDTH; i += 4) {
+        int y = height - margin - ((float)i / MAX_BANDWIDTH) * (height - 2 * margin);
+        cairo_move_to(cr, margin, y);
+        cairo_line_to(cr, width - margin, y);
+        cairo_stroke(cr);
+        
+        // Draw Y-axis labels
+        char label[10];
+        snprintf(label, sizeof(label), "%d", i);
+        cairo_move_to(cr, margin - 20, y);
+        cairo_show_text(cr, label);
+    }
+
+    // Draw labels for X-axis
+    for (int i = 0; i <= 60; i += 10) {
+        int x = margin + ((float)i / 60) * (width - 2 * margin);
+        cairo_move_to(cr, x, height - margin + 20);
+        char label[10];
+        snprintf(label, sizeof(label), "%d", 60 - i);
+        cairo_show_text(cr, label);
+    }
+
+    // Plot the network received data
+    cairo_set_source_rgb(cr, 0, 0, 1); // Blue color for received data
+    cairo_set_line_width(cr, 2.0);
+    for (int i = 0; i < NETWORK_HISTORY; i++) {
+        int x = margin + i * (width - 2 * margin) / NETWORK_HISTORY;
+        int y = height - margin - (net.received[(net.last + i) % NETWORK_HISTORY] / 100.0f) * (height - 2 * margin);
+        if (i == 0) {
+            cairo_move_to(cr, x, y);
+        } else {
+            cairo_line_to(cr, x, y);
+        }
+    }
+    cairo_stroke(cr);
+
+    // Plot the network transmitted data
+    cairo_set_source_rgb(cr, 1, 0, 0); // Red color for transmitted data
+    cairo_set_line_width(cr, 2.0);
+    for (int i = 0; i < NETWORK_HISTORY; i++) {
+        int x = margin + i * (width - 2 * margin) / NETWORK_HISTORY;
+        int y = height - margin - (net.transmitted[(net.last + i) % NETWORK_HISTORY] / 100.0f) * (height - 2 * margin);
+        if (i == 0) {
+            cairo_move_to(cr, x, y);
+        } else {
+            cairo_line_to(cr, x, y);
+        }
+    }
+    cairo_stroke(cr);
+
+    // Add the title
+    cairo_set_source_rgb(cr, 0, 0, 0); // Black color for the title
+    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+    cairo_set_font_size(cr, 16);
+    cairo_move_to(cr, width / 2 - 50, margin / 2);
+    cairo_show_text(cr, "Network History");
+
+    // Reset font for labels
+    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(cr, 12);
+
+    // Draw units label for Y-axis
+    cairo_move_to(cr, 5, margin / 2);
+    cairo_show_text(cr, "KiB/s");
+
+    // Draw time label for X-axis
+    cairo_move_to(cr, width - margin, height - 5);
+    cairo_show_text(cr, "seconds");
+}
+
+static gboolean update_network_usage(gpointer user_data) {
+    GtkWidget *widget = GTK_WIDGET(user_data);
+
+    // Move to the next position in the history array
+    net.last = (net.last + 1) % NETWORK_HISTORY;
+
+    // Read the current network usage
+    read_network_usage();
+
+    // Queue redraw of the network graph
+    gtk_widget_queue_draw(widget);
+
+    return TRUE;
+}
+
 
 // Function to draw the CPU graph with axes and title
 static void draw_cpu_graph(GtkWidget *widget, cairo_t *cr) {
@@ -371,6 +528,7 @@ static void read_memory_usage() {
 void display_resource_usage(GtkWidget *box) {
     memset(&cpu, 0, sizeof(cpu));
     memset(&mem, 0, sizeof(mem));
+    memset(&net, 0, sizeof(net));  
 
     // Create a drawing area for the CPU graph
     g_drawing_area = gtk_drawing_area_new();
@@ -384,8 +542,15 @@ void display_resource_usage(GtkWidget *box) {
     g_signal_connect(G_OBJECT(g_mem_drawing_area), "draw", G_CALLBACK(draw_memory_graph), NULL);
     gtk_box_pack_start(GTK_BOX(box), g_mem_drawing_area, TRUE, TRUE, 0);
 
-    g_timeout_add_seconds(1, (GSourceFunc)update_resource_usage, g_drawing_area);
-    g_timeout_add_seconds(1, (GSourceFunc)update_resource_usage, g_mem_drawing_area);
+    // Create a drawing area for the Network graph
+    GtkWidget *g_net_drawing_area = gtk_drawing_area_new();
+    gtk_widget_set_size_request(g_net_drawing_area, 200, 100);
+    g_signal_connect(G_OBJECT(g_net_drawing_area), "draw", G_CALLBACK(draw_network_graph), NULL);
+    gtk_box_pack_start(GTK_BOX(box), g_net_drawing_area, TRUE, TRUE, 0);
+
+    // Set up timeout functions to periodically update the graphs
+    g_timeout_add_seconds(1, (GSourceFunc)update_resource_usage, NULL);  // For CPU and Memory
+    g_timeout_add_seconds(1, (GSourceFunc)update_network_usage, g_net_drawing_area);  // For Network
 
     gtk_widget_show_all(box);
 }
