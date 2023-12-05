@@ -23,6 +23,7 @@
 #define COLUMN_STATUS 1
 #define COLUMN_PID 2
 #define COLUMN_MEMORY 3
+#define COLUMN_USER 4
 
 void add_tree_view_column(GtkWidget *tree_view, const gchar *title, gint column_id);
 void free_process_list(GList *process_list);
@@ -83,42 +84,58 @@ gchar* get_process_user(uid_t uid) {
     }
 }
 
-gboolean get_process_details(long pid, gchar** out_name, gchar** out_status, gfloat* out_memory) {
-    gchar *path = g_strdup_printf("/proc/%ld/status", pid);
-    gchar *contents = NULL;
+gboolean get_process_details(long pid, gchar** out_name, gchar** out_status, gfloat* out_memory, gchar** out_user) {
+    gchar *status_path = g_strdup_printf("/proc/%ld/status", pid);
+    gchar *status_contents = NULL;
     GError *error = NULL;
 
-    if (!g_file_get_contents(path, &contents, NULL, &error)) {
-        // Handle error, e.g., print it
+    // Read the status file for name and status
+    if (!g_file_get_contents(status_path, &status_contents, NULL, &error)) {
         g_error_free(error);
-        g_free(path);
+        g_free(status_path);
         return FALSE;
     }
 
-    gchar **lines = g_strsplit(contents, "\n", -1);
+    gchar **lines = g_strsplit(status_contents, "\n", -1);
+    uid_t uid = -1;
     for (gint i = 0; lines[i] != NULL; i++) {
         if (g_str_has_prefix(lines[i], "Name:")) {
             *out_name = g_strdup(g_strstrip(lines[i] + 5));
         } else if (g_str_has_prefix(lines[i], "State:")) {
             *out_status = g_strdup(g_strstrip(lines[i] + 6));
+        } else if (g_str_has_prefix(lines[i], "Uid:")) {
+            gchar **tokens = g_strsplit(lines[i], "\t", -1);
+            uid = (uid_t)g_ascii_strtoull(tokens[1], NULL, 10);
+            g_strfreev(tokens);
         }
     }
     g_strfreev(lines);
-    g_free(contents);
-    g_free(path);
+    g_free(status_contents);
+    g_free(status_path);
+
+    // Get the username from UID
+    if (uid != -1) {
+        *out_user = get_username_from_uid(uid);
+    } else {
+        *out_user = g_strdup("Unknown");
+    }
 
     // Memory usage is read from /proc/[pid]/statm
-    path = g_strdup_printf("/proc/%ld/statm", pid);
-    if (g_file_get_contents(path, &contents, NULL, NULL)) {
-        // The first number in statm is the total program size
-        long page_size = sysconf(_SC_PAGESIZE); // Get system page size
-        *out_memory = g_ascii_strtoll(contents, NULL, 10) * page_size / 1024.0 / 1024.0; // Convert to MiB
-        g_free(contents);
-    }
-    g_free(path);
+    gchar *mem_path = g_strdup_printf("/proc/%ld/statm", pid);
+    gchar *mem_contents = NULL;
 
-    return TRUE; 
+    if (g_file_get_contents(mem_path, &mem_contents, NULL, NULL)) {
+        long page_size = sysconf(_SC_PAGESIZE); // Get system page size
+        *out_memory = g_ascii_strtoll(mem_contents, NULL, 10) * page_size / 1024.0 / 1024.0; // Convert to MiB
+        g_free(mem_contents);
+    } else {
+        *out_memory = 0.0; // In case of failure to read memory info
+    }
+    g_free(mem_path);
+
+    return TRUE;
 }
+
 
 
 void get_process_info(GtkListStore *store, gboolean only_user_processes) {
@@ -142,24 +159,22 @@ void get_process_info(GtkListStore *store, gboolean only_user_processes) {
         }
 
         long pid = strtol(entry->d_name, NULL, 10);
-        gchar *name, *status;
+        gchar *name, *status, *user;
         gfloat memory;
-        gboolean success = get_process_details(pid, &name, &status, &memory);
+        gboolean success = get_process_details(pid, &name, &status, &memory, &user); // Updated to pass user
 
         // If the details were successfully retrieved, insert them into the store
         if (success) {
-            struct passwd *pw = getpwuid(user_uid);
-            const gchar *user_name = pw ? pw->pw_name : "Unknown";
-            
-            // Insert the data into the list store
             gtk_list_store_insert_with_values(store, NULL, -1,
                                               0, name,
                                               1, status,
                                               2, (gint)pid,
                                               3, memory,
+                                              4, user, // Include user data in the list store
                                               -1);
             g_free(name);
             g_free(status);
+            g_free(user); // Free the user string
         }
     }
 
@@ -286,6 +301,53 @@ void kill_process(pid_t pid) {
     }
 }
 
+void show_process_details(GtkTreeModel *model, GtkTreeIter *iter) {
+    gchar *name, *status, *user;
+    gint pid;
+    gfloat memory;
+    // Retrieve data from the model
+    gtk_tree_model_get(model, iter,
+                       COLUMN_NAME, &name,
+                       COLUMN_STATUS, &status,
+                       COLUMN_PID, &pid,
+                       COLUMN_MEMORY, &memory,
+                       COLUMN_USER, &user,  // Fetch user data from the correct column
+                       -1);
+
+    // Ensure the user string is valid UTF-8
+    if (!g_utf8_validate(user, -1, NULL)) {
+        g_free(user);
+        user = g_strdup("Invalid UTF-8");
+    }
+
+    // Create a dialog to display the details
+    GtkWidget *dialog = gtk_dialog_new_with_buttons("Process Details",
+                                                    NULL, 
+                                                    GTK_DIALOG_MODAL,
+                                                    "_Close", GTK_RESPONSE_CLOSE,
+                                                    NULL);
+
+    // Create a label to show the details
+    gchar *details = g_strdup_printf("Name: %s\nUser: %s\nStatus: %s\nPID: %d\nMemory: %.2f MiB",
+                                     name, user, status, pid, memory);
+    GtkWidget *label = gtk_label_new(details);
+    gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))),
+                       label, TRUE, TRUE, 0);
+    gtk_widget_show_all(dialog);
+
+    // Run the dialog and wait for a response
+    gtk_dialog_run(GTK_DIALOG(dialog));
+
+    // Clean up
+    gtk_widget_destroy(dialog);
+    g_free(details);
+    g_free(name);
+    g_free(status);
+    g_free(user);
+}
+
+
+
 void on_row_activated(GtkTreeView *tree_view, GtkTreePath *path, GtkTreeViewColumn *col, gpointer userdata) {
     GtkTreeModel *model = gtk_tree_view_get_model(tree_view);
     GtkTreeIter iter;
@@ -294,6 +356,10 @@ void on_row_activated(GtkTreeView *tree_view, GtkTreePath *path, GtkTreeViewColu
         // Get the PID from the model
         gint pid;
         gtk_tree_model_get(model, &iter, COLUMN_PID, &pid, -1);
+
+        show_process_details(model, &iter);
+
+        
 
         // Create a dialog with buttons for different actions
         GtkWidget *dialog = gtk_dialog_new_with_buttons(
@@ -361,7 +427,7 @@ void populate_list_store(GtkListStore *store, GList *process_list) {
 // Function to create and display the tree view for process information
 void display_process_info(GtkWidget *box, gboolean only_user_processes) {
     // Create the list store with appropriate columns for process information
-    GtkListStore *store = gtk_list_store_new(4, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_INT, G_TYPE_FLOAT);
+    GtkListStore *store = gtk_list_store_new(5, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_INT, G_TYPE_FLOAT, G_TYPE_STRING);
 
     // Create the tree view and add it to the list store
     GtkWidget *tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(store));
@@ -372,6 +438,7 @@ void display_process_info(GtkWidget *box, gboolean only_user_processes) {
     add_tree_view_column(tree_view, "Status", 1);
     add_tree_view_column(tree_view, "PID", 2);
     add_tree_view_column(tree_view, "Memory (MiB)", 3);
+    add_tree_view_column(tree_view, "User", 4);
 
     // Populate the initial process list
     get_process_info(store, only_user_processes);
