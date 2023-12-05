@@ -396,6 +396,57 @@ void list_open_files(pid_t pid) {
     g_free(output);
 }
 
+// Function to list memory maps of a process
+void list_memory_maps(pid_t pid) {
+    gchar *filepath = g_strdup_printf("/proc/%d/maps", pid);
+    gchar *contents = NULL;
+    GError *error = NULL;
+
+    // Read the contents of the maps file
+    if (!g_file_get_contents(filepath, &contents, NULL, &error)) {
+        g_warning("Failed to read memory maps: %s", error->message);
+        g_error_free(error);
+        g_free(filepath);
+        return;
+    }
+    g_free(filepath);
+
+    // Create a dialog to display the memory maps
+    GtkWidget *dialog = gtk_dialog_new_with_buttons(
+        "Memory Maps",
+        NULL, // parent window
+        GTK_DIALOG_MODAL,
+        "_Close", GTK_RESPONSE_CLOSE,
+        NULL
+    );
+
+    // Create a scrolled window with a text view
+    GtkWidget *scrolled_window = gtk_scrolled_window_new(NULL, NULL);
+    GtkWidget *text_view = gtk_text_view_new();
+    gtk_text_view_set_editable(GTK_TEXT_VIEW(text_view), FALSE);
+    gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(text_view), GTK_WRAP_WORD);
+    gtk_container_add(GTK_CONTAINER(scrolled_window), text_view);
+
+    // Add the scrolled window to the dialog
+    gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))),
+                       scrolled_window, TRUE, TRUE, 0);
+
+    // Set the text buffer of the text view to the contents of the memory maps
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+    gtk_text_buffer_set_text(buffer, contents, -1);
+
+    // Show all widgets in the dialog
+    gtk_widget_show_all(dialog);
+
+    // Run the dialog and wait for the user to respond
+    gtk_dialog_run(GTK_DIALOG(dialog));
+
+    // Clean up
+    gtk_widget_destroy(dialog);
+    g_free(contents);
+}
+
+
 
 
 
@@ -441,7 +492,7 @@ void on_row_activated(GtkTreeView *tree_view, GtkTreePath *path, GtkTreeViewColu
                 kill_process(pid);
                 break;
             case RESPONSE_LIST_MEMORY_MAPS:
-                // list_memory_maps(pid); // Implement this function
+                list_memory_maps(pid); // Implement this function
                 break;
             case RESPONSE_LIST_OPEN_FILES:
                 list_open_files(pid); // Implement this function
