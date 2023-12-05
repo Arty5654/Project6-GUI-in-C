@@ -5,8 +5,24 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/signal.h>
 #include <pwd.h>
 #include <ctype.h>
+
+#ifndef GTK_RESPONSE_USER_START
+#define GTK_RESPONSE_USER_START (GTK_RESPONSE_DELETE_EVENT + 1)
+#endif
+
+#define RESPONSE_STOP (GTK_RESPONSE_USER_START + 1)
+#define RESPONSE_CONTINUE (GTK_RESPONSE_USER_START + 2)
+#define RESPONSE_KILL (GTK_RESPONSE_USER_START + 3)
+#define RESPONSE_LIST_MEMORY_MAPS (GTK_RESPONSE_USER_START + 4)
+#define RESPONSE_LIST_OPEN_FILES (GTK_RESPONSE_USER_START + 5)
+
+#define COLUMN_NAME 0
+#define COLUMN_STATUS 1
+#define COLUMN_PID 2
+#define COLUMN_MEMORY 3
 
 void add_tree_view_column(GtkWidget *tree_view, const gchar *title, gint column_id);
 void free_process_list(GList *process_list);
@@ -17,11 +33,11 @@ static gfloat get_process_memory(pid_t pid);
 static gint get_process_cpu(pid_t pid);
 
 typedef struct {
-    long pid;             // Process ID
-    gchar *user;          // User name
-    gchar *name;          // Process name
-    gchar *status;        // Process status
-    gfloat memory;        // Memory usage in MiB
+    long pid;             
+    gchar *user;          
+    gchar *name;          
+    gchar *status;        
+    gfloat memory;        
     // CPU usage would be a float representing percentage, but it's complex to calculate
 } ProcessInfo;
 
@@ -86,7 +102,6 @@ gboolean get_process_details(long pid, gchar** out_name, gchar** out_status, gfl
         } else if (g_str_has_prefix(lines[i], "State:")) {
             *out_status = g_strdup(g_strstrip(lines[i] + 6));
         }
-        // ... Other fields can be parsed similarly
     }
     g_strfreev(lines);
     g_free(contents);
@@ -102,7 +117,7 @@ gboolean get_process_details(long pid, gchar** out_name, gchar** out_status, gfl
     }
     g_free(path);
 
-    return TRUE; // Name and status are successfully retrieved
+    return TRUE; 
 }
 
 
@@ -191,7 +206,7 @@ static gchar* get_process_name(pid_t pid) {
         name = g_strdup("Unknown");
     }
     g_free(filepath);
-    return name; // This must be freed by the caller
+    return name; 
 }
 
 
@@ -239,6 +254,94 @@ static gint get_process_cpu(pid_t pid) {
     return utime + stime;
 }
 
+void show_process_dialog(pid_t pid) {
+    // Placeholder for actual implementation
+    printf("Dialog for PID %d would be shown here.\n", pid);
+}
+
+// Function to stop a process
+void stop_process(pid_t pid) {
+    if (kill(pid, SIGSTOP) == -1) {
+        perror("Error stopping process");
+    } else {
+        printf("Process %d stopped\n", pid);
+    }
+}
+
+// Function to continue a process
+void continue_process(pid_t pid) {
+    if (kill(pid, SIGCONT) == -1) {
+        perror("Error continuing process");
+    } else {
+        printf("Process %d continued\n", pid);
+    }
+}
+
+// Function to kill a process
+void kill_process(pid_t pid) {
+    if (kill(pid, SIGKILL) == -1) {
+        perror("Error killing process");
+    } else {
+        printf("Process %d killed\n", pid);
+    }
+}
+
+void on_row_activated(GtkTreeView *tree_view, GtkTreePath *path, GtkTreeViewColumn *col, gpointer userdata) {
+    GtkTreeModel *model = gtk_tree_view_get_model(tree_view);
+    GtkTreeIter iter;
+
+    if (gtk_tree_model_get_iter(model, &iter, path)) {
+        // Get the PID from the model
+        gint pid;
+        gtk_tree_model_get(model, &iter, COLUMN_PID, &pid, -1);
+
+        // Create a dialog with buttons for different actions
+        GtkWidget *dialog = gtk_dialog_new_with_buttons(
+            "Process Actions",
+            NULL, // parent window
+            GTK_DIALOG_MODAL,
+            "_Stop", RESPONSE_STOP,
+            "_Continue", RESPONSE_CONTINUE,
+            "_Kill", RESPONSE_KILL,
+            "_List Memory Maps", RESPONSE_LIST_MEMORY_MAPS,
+            "_List Open Files", RESPONSE_LIST_OPEN_FILES,
+            "_Close", GTK_RESPONSE_CLOSE,
+            NULL
+        );
+
+        // Run the dialog and wait for the user to respond
+        gint result = gtk_dialog_run(GTK_DIALOG(dialog));
+
+        // Handle the response
+        switch (result) {
+            case RESPONSE_STOP:
+                stop_process(pid);
+                break;
+            case RESPONSE_CONTINUE:
+                continue_process(pid);
+                break;
+            case RESPONSE_KILL:
+                kill_process(pid);
+                break;
+            case RESPONSE_LIST_MEMORY_MAPS:
+                // list_memory_maps(pid); // Implement this function
+                break;
+            case RESPONSE_LIST_OPEN_FILES:
+                // list_open_files(pid); // Implement this function
+                break;
+            case GTK_RESPONSE_CLOSE:
+                // Close the dialog
+                break;
+            default:
+                // Handle unexpected response
+                break;
+        }
+
+        // Destroy the dialog once finished
+        gtk_widget_destroy(dialog);
+    }
+}
+
 // Function to populate the GTK list store with the process information
 void populate_list_store(GtkListStore *store, GList *process_list) {
     gtk_list_store_clear(store);
@@ -279,6 +382,9 @@ void display_process_info(GtkWidget *box, gboolean only_user_processes) {
 
     // Pack the scrolled window into the box
     gtk_box_pack_start(GTK_BOX(box), scrolled_window, TRUE, TRUE, 0);
+
+    //If double clicked
+    g_signal_connect(tree_view, "row-activated", G_CALLBACK(on_row_activated), NULL);
 
     // Add a refresh button
     GtkWidget *refresh_button = gtk_button_new_with_label("Refresh");
