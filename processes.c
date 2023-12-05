@@ -327,7 +327,7 @@ void show_process_details(GtkTreeModel *model, GtkTreeIter *iter) {
                                                     GTK_DIALOG_MODAL,
                                                     "_Close", GTK_RESPONSE_CLOSE,
                                                     NULL);
-
+    gtk_window_set_default_size(GTK_WINDOW(dialog), 400, 300);
     // Create a label to show the details
     gchar *details = g_strdup_printf("Name: %s\nUser: %s\nStatus: %s\nPID: %d\nMemory: %.2f MiB",
                                      name, user, status, pid, memory);
@@ -370,6 +370,8 @@ void list_open_files(pid_t pid) {
         "_Close", GTK_RESPONSE_CLOSE,
         NULL
     );
+
+    gtk_window_set_default_size(GTK_WINDOW(dialog), 600, 400);
 
     // Create a scrolled window with a text view
     GtkWidget *scrolled_window = gtk_scrolled_window_new(NULL, NULL);
@@ -420,6 +422,8 @@ void list_memory_maps(pid_t pid) {
         "_Close", GTK_RESPONSE_CLOSE,
         NULL
     );
+
+     gtk_window_set_default_size(GTK_WINDOW(dialog), 600, 400);
 
     // Create a scrolled window with a text view
     GtkWidget *scrolled_window = gtk_scrolled_window_new(NULL, NULL);
