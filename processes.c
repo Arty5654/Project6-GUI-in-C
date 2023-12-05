@@ -346,6 +346,57 @@ void show_process_details(GtkTreeModel *model, GtkTreeIter *iter) {
     g_free(user);
 }
 
+// Function to list open files of a process
+void list_open_files(pid_t pid) {
+    gchar *cmdline = g_strdup_printf("lsof -p %d", pid);
+    gchar *output = NULL;
+    GError *error = NULL;
+
+    // Execute the lsof command and get the output
+    if (!g_spawn_command_line_sync(cmdline, &output, NULL, NULL, &error)) {
+        g_warning("Failed to run lsof: %s", error->message);
+        g_error_free(error);
+        g_free(cmdline);
+        return;
+    }
+    g_free(cmdline);
+
+    // Create a dialog to display the open files
+    GtkWidget *dialog = gtk_dialog_new_with_buttons(
+        "Open Files",
+        NULL, // parent window
+        GTK_DIALOG_MODAL,
+        "_Close", GTK_RESPONSE_CLOSE,
+        NULL
+    );
+
+    // Create a scrolled window with a text view
+    GtkWidget *scrolled_window = gtk_scrolled_window_new(NULL, NULL);
+    GtkWidget *text_view = gtk_text_view_new();
+    gtk_text_view_set_editable(GTK_TEXT_VIEW(text_view), FALSE);
+    gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(text_view), GTK_WRAP_WORD);
+    gtk_container_add(GTK_CONTAINER(scrolled_window), text_view);
+
+    // Add the scrolled window to the dialog
+    gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))),
+                       scrolled_window, TRUE, TRUE, 0);
+
+    // Set the text buffer of the text view to the output of lsof
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+    gtk_text_buffer_set_text(buffer, output, -1);
+
+    // Show all widgets in the dialog
+    gtk_widget_show_all(dialog);
+
+    // Run the dialog and wait for the user to respond
+    gtk_dialog_run(GTK_DIALOG(dialog));
+
+    // Clean up
+    gtk_widget_destroy(dialog);
+    g_free(output);
+}
+
+
 
 
 void on_row_activated(GtkTreeView *tree_view, GtkTreePath *path, GtkTreeViewColumn *col, gpointer userdata) {
@@ -393,7 +444,7 @@ void on_row_activated(GtkTreeView *tree_view, GtkTreePath *path, GtkTreeViewColu
                 // list_memory_maps(pid); // Implement this function
                 break;
             case RESPONSE_LIST_OPEN_FILES:
-                // list_open_files(pid); // Implement this function
+                list_open_files(pid); // Implement this function
                 break;
             case GTK_RESPONSE_CLOSE:
                 // Close the dialog
