@@ -14,6 +14,9 @@ void display_system_info(GtkWidget *info_box) {
   char info_buffer[4096];
   info_buffer[0] = '\0'; // Ensure the buffer is initially empty
 
+  snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "System Information:\n");
+  snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "--------------------------------\n\n");
+
   // Read /etc/os-release file for OS name and version
   FILE *os_release_file = fopen("/etc/os-release", "r");
   if (os_release_file != NULL) {
@@ -30,7 +33,7 @@ void display_system_info(GtkWidget *info_box) {
       else if (strstr(os_release_buffer, "VERSION=") != NULL) {
         char os_version[1024];
         if (sscanf(os_release_buffer, "VERSION=\"%[^\"]\"", os_version) == 1) {
-          snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Version: %s\n\n", os_version);
+          snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Version: %s\n", os_version);
         }
       }
     }
@@ -51,13 +54,15 @@ void display_system_info(GtkWidget *info_box) {
       }
 
       // Append the kernel version to the buffer
-      snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Kernel: %s", version_buffer);
+      snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Kernel: %s\n\n", version_buffer);
     }
     fclose(version_file);
   } else {
     printf("Couldn't open /proc/version\n");
   }
 
+  snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Hardware:\n");
+  snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "--------------------------------\n");
   // Read /proc/meminfo file for memory information
   FILE *meminfo_file = fopen("/proc/meminfo", "r");
   if (meminfo_file != NULL) {
@@ -92,7 +97,7 @@ void display_system_info(GtkWidget *info_box) {
           model_name_start += 2; // Move past the colon and the following space
 
           // Append the processor information to the buffer
-          snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Processor: %s", model_name_start);
+          snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "Processor: %s\n\n", model_name_start);
           break; // Assuming you only want the first occurrence
         }
       }
@@ -102,6 +107,8 @@ void display_system_info(GtkWidget *info_box) {
     printf("Couldn't open /proc/cpuinfo\n");
   }
 
+  snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "System Information:\n");
+  snprintf(info_buffer + strlen(info_buffer), sizeof(info_buffer) - strlen(info_buffer), "--------------------------------\n");
   // Get disk space information using statvfs
   struct statvfs disk_info;
   if (statvfs("/", &disk_info) == 0) {
