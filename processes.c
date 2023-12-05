@@ -302,18 +302,98 @@ void kill_process(pid_t pid) {
     }
 }
 
+// Helper function to read a line from a file
+static gchar* read_first_line(const gchar* filepath) {
+    FILE *file = fopen(filepath, "r");
+    if (file == NULL) {
+        return NULL;
+    }
+    gchar buffer[256];
+    if (fgets(buffer, sizeof(buffer), file) == NULL) {
+        fclose(file);
+        return NULL;
+    }
+    fclose(file);
+    return g_strdup(buffer);
+}
+
+// Function to get virtual memory
+static gchar* get_virtual_memory(pid_t pid) {
+    gchar *filepath = g_strdup_printf("/proc/%d/statm", pid);
+    gchar *line = read_first_line(filepath);
+    gchar **tokens = g_strsplit(line, " ", -1);
+    gchar *vm = g_strdup(tokens[0]); 
+    g_free(filepath);
+    g_free(line);
+    g_strfreev(tokens);
+    return vm;
+}
+
+// Function to get resident memory
+static gchar* get_resident_memory(pid_t pid) {
+    gchar *filepath = g_strdup_printf("/proc/%d/statm", pid);
+    gchar *line = read_first_line(filepath);
+    gchar **tokens = g_strsplit(line, " ", -1);
+    gchar *rm = g_strdup(tokens[1]); 
+    g_free(filepath);
+    g_free(line);
+    g_strfreev(tokens);
+    return rm;
+}
+
+// Function to get shared memory
+static gchar* get_shared_memory(pid_t pid) {
+    gchar *filepath = g_strdup_printf("/proc/%d/statm", pid);
+    gchar *line = read_first_line(filepath);
+    gchar **tokens = g_strsplit(line, " ", -1);
+    gchar *sm = g_strdup(tokens[2]); 
+    g_free(filepath);
+    g_free(line);
+    g_strfreev(tokens);
+    return sm;
+}
+
+// Function to get CPU time
+static gchar* get_cpu_time(pid_t pid) {
+    gchar *filepath = g_strdup_printf("/proc/%d/stat", pid);
+    gchar *line = read_first_line(filepath);
+    gchar **tokens = g_strsplit(line, " ", -1);
+    long utime = atol(tokens[13]);
+    long stime = atol(tokens[14]);
+    gchar *cpu_time = g_strdup_printf("%ld", utime + stime); 
+    g_free(filepath);
+    g_free(line);
+    g_strfreev(tokens);
+    return cpu_time;
+}
+
+// Function to get start time
+static gchar* get_start_time(pid_t pid) {
+    gchar *filepath = g_strdup_printf("/proc/%d/stat", pid);
+    gchar *line = read_first_line(filepath);
+    gchar **tokens = g_strsplit(line, " ", -1);
+    long start_time = atol(tokens[21]); 
+    g_free(filepath);
+    g_free(line);
+    g_strfreev(tokens);
+    return g_strdup_printf("%ld", start_time);
+}
+
+
+
+
 void show_process_details(GtkTreeModel *model, GtkTreeIter *iter) {
     gchar *name, *status, *user;
     gint pid;
     gfloat memory;
-    // Retrieve data from the model
-    gtk_tree_model_get(model, iter,
-                       COLUMN_NAME, &name,
-                       COLUMN_STATUS, &status,
-                       COLUMN_PID, &pid,
-                       COLUMN_MEMORY, &memory,
-                       COLUMN_USER, &user,  // Fetch user data from the correct column
-                       -1);
+    gtk_tree_model_get(model, iter, COLUMN_NAME, &name, COLUMN_STATUS, &status, COLUMN_PID, &pid, COLUMN_MEMORY, &memory, COLUMN_USER, &user, -1);
+
+    // Get additional details
+    gchar *virtual_memory = get_virtual_memory(pid);
+    gchar *resident_memory = get_resident_memory(pid);
+    gchar *shared_memory = get_shared_memory(pid);
+    gchar *cpu_time = get_cpu_time(pid);
+    gchar *start_time = get_start_time(pid);
 
     // Ensure the user string is valid UTF-8
     if (!g_utf8_validate(user, -1, NULL)) {
@@ -322,18 +402,14 @@ void show_process_details(GtkTreeModel *model, GtkTreeIter *iter) {
     }
 
     // Create a dialog to display the details
-    GtkWidget *dialog = gtk_dialog_new_with_buttons("Process Details",
-                                                    NULL, 
-                                                    GTK_DIALOG_MODAL,
-                                                    "_Close", GTK_RESPONSE_CLOSE,
-                                                    NULL);
+    GtkWidget *dialog = gtk_dialog_new_with_buttons("Process Details", NULL, GTK_DIALOG_MODAL, "_Close", GTK_RESPONSE_CLOSE, NULL);
     gtk_window_set_default_size(GTK_WINDOW(dialog), 400, 300);
+
     // Create a label to show the details
-    gchar *details = g_strdup_printf("Name: %s\nUser: %s\nStatus: %s\nPID: %d\nMemory: %.2f MiB",
-                                     name, user, status, pid, memory);
+    gchar *details = g_strdup_printf("Name: %s\nUser: %s\nStatus: %s\nPID: %d\nMemory: %.2f MiB\nVirtual Memory: %s\nResident Memory: %s\nShared Memory: %s\nCPU Time: %s\nStart Time: %s", 
+                                     name, user, status, pid, memory, virtual_memory, resident_memory, shared_memory, cpu_time, start_time);
     GtkWidget *label = gtk_label_new(details);
-    gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))),
-                       label, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), label, TRUE, TRUE, 0);
     gtk_widget_show_all(dialog);
 
     // Run the dialog and wait for a response
@@ -345,7 +421,13 @@ void show_process_details(GtkTreeModel *model, GtkTreeIter *iter) {
     g_free(name);
     g_free(status);
     g_free(user);
+    g_free(virtual_memory);
+    g_free(resident_memory);
+    g_free(shared_memory);
+    g_free(cpu_time);
+    g_free(start_time);
 }
+
 
 // Function to list open files of a process
 void list_open_files(pid_t pid) {
